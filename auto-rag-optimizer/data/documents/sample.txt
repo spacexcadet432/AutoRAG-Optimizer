@@ -1,0 +1,37 @@
+Company Overview
+
+TechNova Solutions is a mid-sized technology company founded in 2012. The company specializes in cloud infrastructure, AI solutions, and enterprise automation tools.
+
+Refund Policy
+
+Customers are eligible for a full refund within 30 days of purchase. After 30 days, refunds are not permitted. Refund requests must be submitted through the customer portal along with proof of purchase.
+
+Support Information
+
+Technical support is available via email at support@technova.com. Premium customers can also access 24/7 live chat support. Standard response time for email inquiries is 24–48 hours.
+
+Leadership Team
+
+The CEO of TechNova Solutions is Elena Martinez. The CTO is Daniel Cho, who leads the AI research division. The CFO is Priya Raman, overseeing financial operations since 2018.
+
+Product Details
+
+TechNova offers three main products:
+1. NovaCloud – A scalable cloud hosting solution.
+2. NovaAI – An AI analytics platform for enterprise clients.
+3. NovaFlow – A workflow automation tool designed for mid-sized businesses.
+
+Subscription Plans
+
+There are three subscription tiers:
+- Basic Plan: Includes NovaCloud only.
+- Pro Plan: Includes NovaCloud and NovaAI.
+- Enterprise Plan: Includes all three products along with dedicated support.
+
+Security and Compliance
+
+TechNova complies with GDPR and SOC 2 standards. All customer data is encrypted in transit and at rest. Two-factor authentication is mandatory for Enterprise Plan users.
+
+Office Locations
+
+The company headquarters is located in Berlin, Germany. There are regional offices in Toronto, Canada and Singapore.

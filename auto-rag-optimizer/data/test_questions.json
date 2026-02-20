@@ -1,0 +1,34 @@
+[
+  {
+    "question": "How long do customers have to request a refund?",
+    "expected_answer": "Customers are eligible for a full refund within 30 days of purchase."
+  },
+  {
+    "question": "What is the support email for TechNova?",
+    "expected_answer": "Technical support is available via email at support@technova.com."
+  },
+  {
+    "question": "Who is the CEO of TechNova Solutions?",
+    "expected_answer": "The CEO of TechNova Solutions is Elena Martinez."
+  },
+  {
+    "question": "Which product is included in the Basic Plan?",
+    "expected_answer": "The Basic Plan includes NovaCloud only."
+  },
+  {
+    "question": "Where is the company headquarters located?",
+    "expected_answer": "The company headquarters is located in Berlin, Germany."
+  },
+  {
+    "question": "Which compliance standards does TechNova follow?",
+    "expected_answer": "TechNova complies with GDPR and SOC 2 standards."
+  },
+  {
+    "question": "Who leads the AI research division?",
+    "expected_answer": "Daniel Cho leads the AI research division."
+  },
+  {
+    "question": "What additional benefit do Enterprise Plan users receive?",
+    "expected_answer": "Enterprise Plan users receive dedicated support."
+  }
+]
