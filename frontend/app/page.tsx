@@ -104,21 +104,29 @@ export default function HomePage() {
       setUploadError("Only .txt files are supported.");
       return;
     }
+    if (file.size > 3 * 1024 * 1024) {
+      setUploadError("File too large. Max size is 3MB.");
+      return;
+    }
 
     setUploading(true);
     setUploadError(null);
     setResult(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("openai_api_key", openaiApiKey);
-    formData.append("chunk_size", String(chunkSize));
-    formData.append("overlap", String(overlap));
-
     try {
-      const response = await fetch(`${BACKEND_URL}/upload`, {
+      const text = await file.text();
+      const response = await fetch(`${BACKEND_URL}/upload-text`, {
         method: "POST",
-        body: formData
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          file_name: file.name,
+          text,
+          openai_api_key: openaiApiKey,
+          chunk_size: chunkSize,
+          overlap
+        })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {

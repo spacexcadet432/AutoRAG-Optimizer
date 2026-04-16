@@ -259,6 +259,27 @@ def upload_dataset(
     return upload_state
 
 
+def upload_dataset_text(
+    file_name: str,
+    text: str,
+    openai_api_key: str,
+    chunk_size: int = DEFAULT_UPLOAD_CHUNK_SIZE,
+    overlap: int = DEFAULT_UPLOAD_OVERLAP,
+) -> UploadDatasetState:
+    """
+    Upload dataset from raw text payload (JSON path, no multipart transport).
+    """
+
+    file_bytes = text.encode("utf-8")
+    return upload_dataset(
+        file_name=file_name,
+        file_bytes=file_bytes,
+        openai_api_key=openai_api_key,
+        chunk_size=chunk_size,
+        overlap=overlap,
+    )
+
+
 def reset_dataset() -> None:
     """Clear the in-memory uploaded dataset."""
 

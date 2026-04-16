@@ -9,9 +9,16 @@ from backend.schemas import (
     RetrievedChunkResponse,
     RunRAGRequest,
     RunRAGResponse,
+    UploadTextRequest,
     UploadResponse,
 )
-from services.rag_service import get_dataset_status, reset_dataset, run_rag_experiment, upload_dataset
+from services.rag_service import (
+    get_dataset_status,
+    reset_dataset,
+    run_rag_experiment,
+    upload_dataset,
+    upload_dataset_text,
+)
 
 
 app = FastAPI(title="AutoRAG Optimizer API", version="1.2.0")
@@ -61,6 +68,38 @@ async def upload(
             openai_api_key=openai_api_key,
             chunk_size=chunk_size,
             overlap=overlap,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}") from exc
+
+    return UploadResponse(
+        message="Dataset uploaded and indexed successfully.",
+        file_name=state.file_name,
+        file_size_bytes=state.file_size_bytes,
+        chunk_count=len(state.chunks),
+        chunk_size=state.chunk_size,
+        overlap=state.overlap,
+    )
+
+
+@app.post("/upload-text", response_model=UploadResponse)
+def upload_text(payload: UploadTextRequest) -> UploadResponse:
+    """
+    Upload text content directly as JSON (more reliable than multipart in demos).
+    """
+
+    if not payload.openai_api_key.strip():
+        raise HTTPException(status_code=400, detail="Missing API key.")
+
+    try:
+        state = upload_dataset_text(
+            file_name=payload.file_name,
+            text=payload.text,
+            openai_api_key=payload.openai_api_key,
+            chunk_size=payload.chunk_size,
+            overlap=payload.overlap,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

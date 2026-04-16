@@ -58,6 +58,16 @@ class UploadResponse(BaseModel):
     overlap: int
 
 
+class UploadTextRequest(BaseModel):
+    """POST /upload-text request."""
+
+    file_name: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    openai_api_key: str = Field(min_length=10)
+    chunk_size: int = Field(default=500, ge=100, le=4000)
+    overlap: int = Field(default=100, ge=0, le=2000)
+
+
 class DatasetStatusResponse(BaseModel):
     """GET /dataset-status response."""
 
