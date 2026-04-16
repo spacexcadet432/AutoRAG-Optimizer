@@ -46,3 +46,25 @@ class RunRAGResponse(BaseModel):
     metrics: MetricsResponse
     latency: float
 
+
+class UploadResponse(BaseModel):
+    """POST /upload response."""
+
+    message: str
+    file_name: str
+    file_size_bytes: int
+    chunk_count: int
+    chunk_size: int
+    overlap: int
+
+
+class DatasetStatusResponse(BaseModel):
+    """GET /dataset-status response."""
+
+    loaded: bool
+    file_name: str | None = None
+    file_size_bytes: int | None = None
+    chunk_count: int | None = None
+    chunk_size: int | None = None
+    overlap: int | None = None
+

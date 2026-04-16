@@ -1,23 +1,24 @@
-"""Service layer for production RAG execution."""
+"""Service layer for in-memory uploaded-dataset RAG execution."""
 
 from __future__ import annotations
 
-import json
-import os
 import re
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 
 import faiss
 import numpy as np
 from openai import OpenAI
 
 from core.chunking import chunk_text
-from core.retrieval import compute_index_id, index_paths
 
 
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
+MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024
+MAX_CHUNKS = 800
+DEFAULT_UPLOAD_CHUNK_SIZE = 500
+DEFAULT_UPLOAD_OVERLAP = 100
 
 
 @dataclass
@@ -29,87 +30,16 @@ class RetrievedChunk:
 
 
 @dataclass
-class CachedIndex:
-    """In-memory representation of a FAISS index and aligned chunks."""
+class UploadDatasetState:
+    """Global in-memory state for the currently uploaded dataset."""
 
-    index: faiss.Index
+    file_name: str
+    file_size_bytes: int
     chunks: List[str]
-
-
-class RAGRuntime:
-    """
-    Runtime cache for deployment:
-    - document text is loaded once at startup
-    - FAISS indexes are preloaded once at startup when available
-    - request path only embeds query/answer and runs retrieval/generation
-    """
-
-    def __init__(self, document_path: str, supported_configs: List[Tuple[int, int]]) -> None:
-        self.document_path = document_path
-        self.supported_configs = supported_configs
-        self.document_text: Optional[str] = None
-        self.index_cache: Dict[Tuple[int, int], CachedIndex] = {}
-
-    def startup(self) -> None:
-        """Load corpus and available FAISS indexes into memory."""
-
-        self.document_text = _load_document(self.document_path)
-
-        for chunk_size, overlap in self.supported_configs:
-            config = {
-                "chunk_size": chunk_size,
-                "overlap": overlap,
-                "top_k": 3,
-                "prompt_style": "basic",
-            }
-            index_id = compute_index_id(
-                config=config,
-                document_path=self.document_path,
-                embedding_model=EMBEDDING_MODEL_NAME,
-            )
-            faiss_path, chunks_path = index_paths(index_id)
-
-            if os.path.exists(faiss_path) and os.path.exists(chunks_path):
-                index = faiss.read_index(faiss_path)
-                with open(chunks_path, "r", encoding="utf-8") as f:
-                    chunks = json.load(f)
-                self.index_cache[(chunk_size, overlap)] = CachedIndex(index=index, chunks=chunks)
-
-    def _build_and_cache_index(self, client: OpenAI, chunk_size: int, overlap: int) -> CachedIndex:
-        """
-        Build and cache index on first use when startup preload artifact is absent.
-
-        This avoids per-request recomputation after first use.
-        """
-
-        if self.document_text is None:
-            raise RuntimeError("Runtime not initialized.")
-
-        chunks = chunk_text(self.document_text, chunk_size=chunk_size, overlap=overlap)
-        chunk_vectors = _embed_texts(client, chunks)
-        index = faiss.IndexFlatIP(chunk_vectors.shape[1])
-        index.add(chunk_vectors)
-
-        cached = CachedIndex(index=index, chunks=chunks)
-        self.index_cache[(chunk_size, overlap)] = cached
-        return cached
-
-    def get_index(self, client: OpenAI, chunk_size: int, overlap: int) -> CachedIndex:
-        """Get cached index for config; build once if missing."""
-
-        key = (chunk_size, overlap)
-        if key in self.index_cache:
-            return self.index_cache[key]
-        return self._build_and_cache_index(client=client, chunk_size=chunk_size, overlap=overlap)
-
-
-def _load_document(document_path: str) -> str:
-    """Load plain text document from disk."""
-
-    if not os.path.exists(document_path):
-        raise FileNotFoundError(f"Document not found: {document_path}")
-    with open(document_path, "r", encoding="utf-8") as f:
-        return f.read()
+    embeddings: np.ndarray
+    faiss_index: faiss.Index
+    chunk_size: int
+    overlap: int
 
 
 def _normalize(vectors: np.ndarray) -> np.ndarray:
@@ -126,6 +56,15 @@ def _embed_texts(client: OpenAI, texts: List[str]) -> np.ndarray:
     response = client.embeddings.create(model="text-embedding-3-small", input=texts)
     vectors = np.asarray([item.embedding for item in response.data], dtype="float32")
     return _normalize(vectors)
+
+
+def _clean_text(text: str) -> str:
+    """Apply basic normalization to uploaded text."""
+
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
 
 
 def _build_prompt(question: str, retrieved_chunks: List[RetrievedChunk], prompt_style: str) -> str:
@@ -235,29 +174,24 @@ def run_rag_experiment(
     query: str,
     config: Dict[str, int | str],
     openai_api_key: str,
-    document_path: str = "data/documents/sample.txt",
 ) -> Tuple[str, List[RetrievedChunk], Dict[str, float], float]:
     """
     Execute one end-to-end RAG run and return answer, chunks, metrics, latency.
     """
 
-    if runtime is None:
-        raise RuntimeError("RAG runtime is not initialized.")
+    if upload_state is None:
+        raise RuntimeError("Please upload a dataset first.")
 
     client = OpenAI(api_key=openai_api_key)
     start = time.perf_counter()
 
-    chunk_size = int(config["chunk_size"])
-    overlap = int(config["overlap"])
-    cached = runtime.get_index(client=client, chunk_size=chunk_size, overlap=overlap)
-
     query_vector = _embed_texts(client, [query])
-    distances, indices = cached.index.search(query_vector, int(config["top_k"]))
+    distances, indices = upload_state.faiss_index.search(query_vector, int(config["top_k"]))
 
     retrieved: List[RetrievedChunk] = []
     for score, idx in zip(distances[0], indices[0]):
-        if 0 <= idx < len(cached.chunks):
-            retrieved.append(RetrievedChunk(text=cached.chunks[idx], score=float(score)))
+        if 0 <= idx < len(upload_state.chunks):
+            retrieved.append(RetrievedChunk(text=upload_state.chunks[idx], score=float(score)))
 
     prompt = _build_prompt(query, retrieved, str(config["prompt_style"]))
     answer = _generate_answer(client, prompt)
@@ -274,30 +208,75 @@ def run_rag_experiment(
     return answer, retrieved, metrics, latency
 
 
-runtime: Optional[RAGRuntime] = None
+upload_state: Optional[UploadDatasetState] = None
 
 
-def initialize_runtime(
-    document_path: str = "data/documents/sample.txt",
-    supported_configs: Optional[List[Tuple[int, int]]] = None,
-) -> RAGRuntime:
-    """
-    Initialize global runtime cache for FastAPI startup.
-    """
+def upload_dataset(
+    file_name: str,
+    file_bytes: bytes,
+    openai_api_key: str,
+    chunk_size: int = DEFAULT_UPLOAD_CHUNK_SIZE,
+    overlap: int = DEFAULT_UPLOAD_OVERLAP,
+) -> UploadDatasetState:
+    """Validate uploaded text, chunk it, embed it, and build FAISS index in memory."""
 
-    global runtime
-    configs = supported_configs or [
-        (200, 0),
-        (200, 50),
-        (200, 100),
-        (300, 0),
-        (300, 50),
-        (300, 100),
-        (500, 0),
-        (500, 50),
-        (500, 100),
-    ]
-    runtime = RAGRuntime(document_path=document_path, supported_configs=configs)
-    runtime.startup()
-    return runtime
+    global upload_state
+
+    if not file_name.lower().endswith(".txt"):
+        raise ValueError("Only .txt files are supported.")
+    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+        raise ValueError("File too large. Max size is 3MB.")
+    if overlap >= chunk_size:
+        raise ValueError("overlap must be smaller than chunk_size.")
+
+    try:
+        decoded = file_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Unable to decode file. Please upload UTF-8 text.") from exc
+
+    cleaned = _clean_text(decoded)
+    if not cleaned:
+        raise ValueError("Empty file. Please upload a non-empty text file.")
+
+    chunks = chunk_text(cleaned, chunk_size=chunk_size, overlap=overlap)
+    if len(chunks) > MAX_CHUNKS:
+        raise ValueError("Dataset too large")
+
+    client = OpenAI(api_key=openai_api_key)
+    embeddings = _embed_texts(client, chunks)
+    index = faiss.IndexFlatIP(embeddings.shape[1])
+    index.add(embeddings)
+
+    upload_state = UploadDatasetState(
+        file_name=file_name,
+        file_size_bytes=len(file_bytes),
+        chunks=chunks,
+        embeddings=embeddings,
+        faiss_index=index,
+        chunk_size=chunk_size,
+        overlap=overlap,
+    )
+    return upload_state
+
+
+def reset_dataset() -> None:
+    """Clear the in-memory uploaded dataset."""
+
+    global upload_state
+    upload_state = None
+
+
+def get_dataset_status() -> Dict[str, object]:
+    """Return current in-memory dataset status for frontend sync."""
+
+    if upload_state is None:
+        return {"loaded": False}
+    return {
+        "loaded": True,
+        "file_name": upload_state.file_name,
+        "file_size_bytes": upload_state.file_size_bytes,
+        "chunk_count": len(upload_state.chunks),
+        "chunk_size": upload_state.chunk_size,
+        "overlap": upload_state.overlap,
+    }
 
