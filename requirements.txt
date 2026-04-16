@@ -9,3 +9,4 @@ requests
 matplotlib
 seaborn
 pandas
+python-multipart
