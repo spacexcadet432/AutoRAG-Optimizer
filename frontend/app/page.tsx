@@ -37,7 +37,8 @@ export default function HomePage() {
 
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [result, setResult] = useState<RunRAGResponse | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [datasetStatus, setDatasetStatus] = useState<DatasetStatus>({ loaded: false });
@@ -92,20 +93,20 @@ export default function HomePage() {
 
   async function uploadFile(file: File) {
     if (!BACKEND_URL) {
-      setError("Backend URL is not configured. Set NEXT_PUBLIC_BACKEND_URL in Vercel project settings.");
+      setUploadError("Backend URL is not configured. Set NEXT_PUBLIC_BACKEND_URL in Vercel project settings.");
       return;
     }
     if (!openaiApiKey.trim()) {
-      setError("Please enter your OpenAI API key before uploading.");
+      setUploadError("Please enter your OpenAI API key before uploading.");
       return;
     }
     if (!file.name.toLowerCase().endsWith(".txt")) {
-      setError("Only .txt files are supported.");
+      setUploadError("Only .txt files are supported.");
       return;
     }
 
     setUploading(true);
-    setError(null);
+    setUploadError(null);
     setResult(null);
 
     const formData = new FormData();
@@ -133,7 +134,7 @@ export default function HomePage() {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
-      setError(message);
+      setUploadError(message);
       setDatasetStatus({ loaded: false });
     } finally {
       setUploading(false);
@@ -164,7 +165,8 @@ export default function HomePage() {
     if (!BACKEND_URL) {
       return;
     }
-    setError(null);
+    setRunError(null);
+    setUploadError(null);
     setResult(null);
     try {
       await fetch(`${BACKEND_URL}/reset-dataset`, { method: "POST" });
@@ -177,18 +179,18 @@ export default function HomePage() {
     event.preventDefault();
     if (!canRun) {
       if (!datasetStatus.loaded) {
-        setError("Please upload a dataset first.");
+        setRunError("Please upload a dataset first.");
       }
       return;
     }
 
     if (!BACKEND_URL) {
-      setError("Backend URL is not configured. Set NEXT_PUBLIC_BACKEND_URL in Vercel project settings.");
+      setRunError("Backend URL is not configured. Set NEXT_PUBLIC_BACKEND_URL in Vercel project settings.");
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setRunError(null);
     setResult(null);
 
     try {
@@ -225,7 +227,7 @@ export default function HomePage() {
         rawMessage.toLowerCase().includes("failed to fetch") || rawMessage.trim().length === 0
           ? defaultMessage
           : rawMessage;
-      setError(message);
+      setRunError(message);
     } finally {
       setLoading(false);
     }
@@ -268,6 +270,7 @@ export default function HomePage() {
             </div>
             <label htmlFor="datasetFile">Or Upload .txt File</label>
             <input id="datasetFile" type="file" accept=".txt,text/plain" onChange={handleFileChange} />
+            {uploadError && <div className="error" style={{ marginTop: 10 }}>{uploadError}</div>}
             {uploading && <div className="upload-status">Uploading and building embeddings...</div>}
             {datasetStatus.loaded && (
               <div className="upload-status">
@@ -330,7 +333,7 @@ export default function HomePage() {
           <h2 className="section-title">Output Panel</h2>
 
           {loading && <div className="answer-box">Running pipeline, retrieving chunks, and scoring metrics...</div>}
-          {error && <div className="error">{error}</div>}
+          {runError && <div className="error">{runError}</div>}
 
           {result && (
             <>
