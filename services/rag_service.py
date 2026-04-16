@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Union
 
 import faiss
 import numpy as np
@@ -172,7 +172,7 @@ def compute_metrics(
 
 def run_rag_experiment(
     query: str,
-    config: Dict[str, int | str],
+    config: Dict[str, Union[int, str]],
     openai_api_key: str,
 ) -> Tuple[str, List[RetrievedChunk], Dict[str, float], float]:
     """

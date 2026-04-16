@@ -1,6 +1,6 @@
 """Pydantic schemas for backend API contracts."""
 
-from typing import Literal, List
+from typing import Literal, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -72,9 +72,9 @@ class DatasetStatusResponse(BaseModel):
     """GET /dataset-status response."""
 
     loaded: bool
-    file_name: str | None = None
-    file_size_bytes: int | None = None
-    chunk_count: int | None = None
-    chunk_size: int | None = None
-    overlap: int | None = None
+    file_name: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+    chunk_count: Optional[int] = None
+    chunk_size: Optional[int] = None
+    overlap: Optional[int] = None
 
